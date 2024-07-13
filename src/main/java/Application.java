@@ -1,173 +1,199 @@
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 
 public class Application {
 
-    private static final String NEW_GAME = "[N]ew game or [e]xit?";
+    private static final String NEW_GAME_PROMPT = "[N]ew game or [e]xit?";
+    private static final Path DICTIONARY_PATH = Path.of("src/main/resources/russian-nouns.txt");
 
-    private static final Path pathToDictionary = Path.of("src/main/resources/russian-nouns.txt");
-
-    private static final Scanner scanner = new Scanner(System.in);
-
-    private static final List<String> usedWords = new ArrayList<>();
+    private static final Scanner SCANNER = new Scanner(System.in);
+    private static final Set<Character> usedLetters = new HashSet<>();
+    private static final Set<String> usedWords = new HashSet<>();
 
     private static int mistakesCounter;
-
-    private static int correctAnswer;
-
+    private static int correctAnswers;
     private static StringBuilder hiddenWord;
 
     public static void main(String[] args) {
-        startGame();
+        startApplication();
     }
 
-// запуск приложения (начать новую игру? / выбрать сложность)
-
-    public static void startGame() {
+    private static void startApplication() {
         while (true) {
-
-            System.out.println(NEW_GAME);
-
-            String command = scanner.nextLine().toLowerCase();
+            System.out.println(NEW_GAME_PROMPT);
+            String command = SCANNER.nextLine().toLowerCase();
 
             switch (command) {
-                case "n" -> startGameLoop();
+                case "n" -> startNewGame();
                 case "e" -> System.exit(0);
                 default -> System.out.println("Invalid command");
             }
         }
     }
 
-    private static void startGameLoop() {
-        boolean flag = true;
-
-        usedWords.clear();
-        mistakesCounter = 0;
-        correctAnswer = 0;
-
-        List<String> dictionary = readDictionaryAndReturnWord();
-        String guessedWord = getWord(dictionary);
+    private static void startNewGame() {
+        resetGame();
+        List<String> dictionary = loadDictionary();
+        String guessedWord = getRandomWord(dictionary);
         hiddenWord = new StringBuilder("-".repeat(guessedWord.length()));
 
-        while (flag) {
+        while (!isGameOver(guessedWord)) {
             Character playerInput = getPlayerInput();
-            checkLetter(playerInput, guessedWord);
-            flag = checkConditions(guessedWord);
+            processPlayerInput(playerInput, guessedWord);
+            displayGameState();
         }
-
     }
 
-    private static boolean checkConditions(String guessedWord) {
-        if (correctAnswer == guessedWord.length()) {
-            System.out.println("Congrats!");
-            return false;
-        } else if (mistakesCounter == guessedWord.length()) {
-            System.out.println("You lose, try again");
-            return false;
-        }
-        return true;
+    private static void resetGame() {
+        usedLetters.clear();
+        mistakesCounter = 0;
+        correctAnswers = 0;
     }
 
-// загрузить словарь в приложение
+    private static boolean isGameOver(String guessedWord) {
+        if (correctAnswers == guessedWord.length()) {
+            System.out.println("Congrats! You guessed the word.");
+            return true;
+        } else if (mistakesCounter >= 6) {
+            System.out.println("You lose! The correct word was: " + guessedWord);
+            return true;
+        }
+        return false;
+    }
 
-    private static List<String> readDictionaryAndReturnWord() {
+
+    private static List<String> loadDictionary() {
         try {
-            return Files.readAllLines(pathToDictionary);
+            return Files.readAllLines(DICTIONARY_PATH);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Failed to load dictionary", e);
         }
     }
 
-// выбрать случайное слово (в пределах одной игры исключить возможность повтора)
+    private static String getRandomWord(List<String> dictionary) {
+        String randomWord;
+        do {
+            randomWord = dictionary.get((int) (Math.random() * dictionary.size()));
+        } while (usedWords.contains(randomWord));
 
-    private static String getWord(List<String> dictionary) {
-        int randomInt = (int) (Math.random() * dictionary.size());
-        String randomWord = "";
-        boolean accept = false;
-
-        while (!accept) {
-            randomWord = dictionary.get(randomInt);
-            accept = !usedWords.contains(randomWord);
-        }
-
+        usedWords.add(randomWord);
         return randomWord;
     }
 
-    // отобразить маску слова
-    private static String hideWord(String randomWord) {
-        return randomWord.replaceAll("[а-яА-Я]", "-");
-    }
-
-// ввод -> валидность -> в зависимости от ввода проверить наличие данной буквы в слове
-
     private static Character getPlayerInput() {
         while (true) {
-            String inputChar = scanner.nextLine();
+            System.out.print("Enter a letter: ");
+            String input = SCANNER.nextLine();
 
-            if (inputChar.length() != 1) {
-                System.out.println("Input only one letter you want to check");
-                continue;
+            if (input.length() == 1 && input.matches("[а-я]")) {
+                char guessedChar = input.charAt(0);
+                if (!usedLetters.contains(guessedChar)) {
+                    usedLetters.add(guessedChar);
+                    return guessedChar;
+                } else {
+                    System.out.println("You've already used this letter.");
+                }
+            } else {
+                System.out.println("Invalid input. Please enter a single lowercase Cyrillic letter.");
             }
-
-            return inputChar.charAt(0);
         }
     }
 
-    private static void checkLetter(Character guessedChar, String guessedWord) {
+    private static void processPlayerInput(Character guessedChar, String guessedWord) {
         if (guessedWord.contains(guessedChar.toString())) {
-            System.out.println(showGuessedLetters(guessedChar, guessedWord));
-            System.out.println("Ошибок совершено" + mistakesCounter);
+            revealGuessedLetters(guessedChar, guessedWord);
         } else {
-            System.out.println(showGuessedLetters(guessedChar, guessedWord));
+            mistakesCounter++;
             showHangman();
-            System.out.println("Ошибок совершено" + ++mistakesCounter);
         }
-
     }
 
 // отобразить часть виселицы / открыть буквы в маске
 
-    private static String showGuessedLetters(Character guessedChar, String guessedWord) {
-
-
+    private static void revealGuessedLetters(Character guessedChar, String guessedWord) {
         for (int i = 0; i < guessedWord.length(); i++) {
             if (guessedWord.charAt(i) == guessedChar) {
                 hiddenWord.setCharAt(i, guessedChar);
-                correctAnswer++;
+                correctAnswers++;
             }
         }
-        return hiddenWord.toString();
+    }
+
+    private static void displayGameState() {
+        System.out.println("Current word: " + hiddenWord);
+        System.out.println("Mistakes: " + mistakesCounter);
+        System.out.println("Used letters: " + usedLetters);
     }
 
     private static void showHangman() {
-        System.out.println("""
-                                +---+
-                                |   |
-                                O   |
-                               /|\\  |
-                               / \\  |
-                                    |
-                            =========
-                """);
+        String[] hangmanStages = {
+                """
+                        +---+
+                        |   |
+                            |
+                            |
+                            |
+                            |
+                    =========
+                """,
+                """
+                        +---+
+                        |   |
+                        O   |
+                            |
+                            |
+                            |
+                    =========
+                """,
+                """
+                        +---+
+                        |   |
+                        O   |
+                        |   |
+                            |
+                            |
+                    =========
+                """,
+                """
+                        +---+
+                        |   |
+                        O   |
+                       /|   |
+                            |
+                            |
+                    =========
+                """,
+                """
+                        +---+
+                        |   |
+                        O   |
+                       /|\\  |
+                            |
+                            |
+                    =========
+                """,
+                """
+                        +---+
+                        |   |
+                        O   |
+                       /|\\  |
+                       /    |
+                            |
+                    =========
+                """,
+                """
+                        +---+
+                        |   |
+                        O   |
+                       /|\\  |
+                       / \\  |
+                            |
+                    =========
+                """
+        };
+        System.out.println(hangmanStages[mistakesCounter]);
     }
 
-// после завершения игры предложить повторную игру или завершить работу
-
 }
-
-/*Загадывается слово — пишется любые две буквы слова и отмечает места для остальных букв чертами
-(существует также вариант, когда изначально все буквы слова неизвестны).
-Также рисуется виселица с петлёй.
-Игрок предлагает букву, которая может входить в это слово. Если такая буква есть в слове,
-то буква пишется вместо соответствующим этой букве чертами — столько раз, сколько она встречается в слове.
-Если такой буквы нет, то к виселице добавляется круг в петле, изображающий голову.
-Игрок продолжает отгадывать буквы до тех пор, пока не отгадает всё слово.
-За каждый неправильный ответ первый игрок добавляет одну часть туловища к виселице (обычно их 6: голова, туловище,
-2 руки и 2 ноги, существует также вариант с 8 частями — добавляются ступни, а также самый длинный вариант,
-когда сначала за неотгаданную букву рисуются части самой виселицы).
-Если туловище в виселице нарисовано полностью, то отгадывающий игрок проигрывает, считается повешенным.
-Если игроку удаётся угадать слово, он выигрывает и может загадывать слово.*/
