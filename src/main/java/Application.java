@@ -1,23 +1,22 @@
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.Scanner;
+import java.util.*;
 
 public class Application {
 
     private static final String NEW_GAME = "[N]ew game or [e]xit?";
 
-    private static final Path pathToDictionary = Path.of("resources/russian-nouns.txt");
+    private static final Path pathToDictionary = Path.of("src/main/resources/russian-nouns.txt");
 
     private static final Scanner scanner = new Scanner(System.in);
 
     private static final List<String> usedWords = new ArrayList<>();
 
+    private static int mistakesCounter = 0;
+
     public static void main(String[] args) {
-        System.out.println("Hello World!");
+        startGame();
     }
 
 // запуск приложения (начать новую игру? / выбрать сложность)
@@ -38,35 +37,95 @@ public class Application {
     }
 
     private static void startGameLoop() {
+        boolean flag = true;
+
         usedWords.clear();
+        mistakesCounter = 0;
+        List<String> dictionary = readDictionaryAndReturnWord();
+        String guessedWord = getWord(dictionary);
+        String hiddenWord = hideWord(guessedWord);
+
+        while (flag) {
+            Character playerInput = getPlayerInput();
+            checkLetter(playerInput, guessedWord);
+            // добавить вывод использованных букв
+        }
+
     }
 
 // загрузить словарь в приложение
 
-    private static List<String> readDictionaryAndReturnWord() throws IOException {
-        List<String> dictionary = Files.readAllLines(pathToDictionary);
-        return dictionary;
+    private static List<String> readDictionaryAndReturnWord() {
+        try {
+            return Files.readAllLines(pathToDictionary);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 // выбрать случайное слово (в пределах одной игры исключить возможность повтора)
 
     private static String getWord(List<String> dictionary) {
-        Random random = new Random();
-        int randomIndex = random.nextInt(dictionary.size());
-        if (!usedWords.contains(dictionary.get(randomIndex))) {
-            return dictionary.get(randomIndex);
-        } else {
-            randomIndex = random.nextInt(dictionary.size());
-            usedWords.add(dictionary.get(randomIndex));
-            return dictionary.get(randomIndex);
+        int randomInt = (int) Math.random() * dictionary.size();
+        String randomWord = "";
+        boolean accept = false;
+
+        while (!accept) {
+            randomWord = dictionary.get(randomInt);
+            accept = !usedWords.contains(randomWord);
         }
+
+        return randomWord;
     }
 
-// отобразить маску слова
+    // отобразить маску слова
+    private static String hideWord(String randomWord) {
+        String hiddenWord = randomWord.replaceAll("[а-яА-Я]", "-");
+
+        return hiddenWord;
+    }
 
 // ввод -> валидность -> в зависимости от ввода проверить наличие данной буквы в слове
 
+    private static Character getPlayerInput() {
+        while (true) {
+            String inputChar = scanner.nextLine();
+
+            if (inputChar.length() != 1) {
+                System.out.println("Input only one letter you want to check");
+                continue;
+            }
+
+            return inputChar.charAt(0);
+        }
+    }
+
+    private static void checkLetter(Character guessedChar, String hiddenWord) {
+        if (hiddenWord.contains(guessedChar.toString())) {
+            System.out.println(showGuessedLetters(guessedChar, hiddenWord));
+
+        } else {
+            showHangman();
+            System.out.println(mistakesCounter++);
+        }
+
+    }
+
 // отобразить часть виселицы / открыть буквы в маске
+
+    private static String showGuessedLetters(Character guessedChar, String guessedWord) {
+        char[] stringToArray = guessedWord.toCharArray();
+        for (int i = 0; i < guessedWord.length(); i++) {
+            if (stringToArray[i] == guessedChar) {
+                stringToArray[i] = guessedChar;
+            }
+        }
+        return Arrays.toString(stringToArray);
+    }
+
+    private static void showHangman() {
+        System.out.println("Haha");
+    }
 
 // после завершения игры предложить повторную игру или завершить работу
 
