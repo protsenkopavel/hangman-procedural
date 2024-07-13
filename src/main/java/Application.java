@@ -1,7 +1,9 @@
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
 
 public class Application {
 
@@ -13,7 +15,11 @@ public class Application {
 
     private static final List<String> usedWords = new ArrayList<>();
 
-    private static int mistakesCounter = 0;
+    private static int mistakesCounter;
+
+    private static int correctAnswer;
+
+    private static StringBuilder hiddenWord;
 
     public static void main(String[] args) {
         startGame();
@@ -41,16 +47,29 @@ public class Application {
 
         usedWords.clear();
         mistakesCounter = 0;
+        correctAnswer = 0;
+
         List<String> dictionary = readDictionaryAndReturnWord();
         String guessedWord = getWord(dictionary);
-        String hiddenWord = hideWord(guessedWord);
+        hiddenWord = new StringBuilder("-".repeat(guessedWord.length()));
 
         while (flag) {
             Character playerInput = getPlayerInput();
             checkLetter(playerInput, guessedWord);
-            // добавить вывод использованных букв
+            flag = checkConditions(guessedWord);
         }
 
+    }
+
+    private static boolean checkConditions(String guessedWord) {
+        if (correctAnswer == guessedWord.length()) {
+            System.out.println("Congrats!");
+            return false;
+        } else if (mistakesCounter == guessedWord.length()) {
+            System.out.println("You lose, try again");
+            return false;
+        }
+        return true;
     }
 
 // загрузить словарь в приложение
@@ -66,7 +85,7 @@ public class Application {
 // выбрать случайное слово (в пределах одной игры исключить возможность повтора)
 
     private static String getWord(List<String> dictionary) {
-        int randomInt = (int) Math.random() * dictionary.size();
+        int randomInt = (int) (Math.random() * dictionary.size());
         String randomWord = "";
         boolean accept = false;
 
@@ -80,9 +99,7 @@ public class Application {
 
     // отобразить маску слова
     private static String hideWord(String randomWord) {
-        String hiddenWord = randomWord.replaceAll("[а-яА-Я]", "-");
-
-        return hiddenWord;
+        return randomWord.replaceAll("[а-яА-Я]", "-");
     }
 
 // ввод -> валидность -> в зависимости от ввода проверить наличие данной буквы в слове
@@ -100,13 +117,14 @@ public class Application {
         }
     }
 
-    private static void checkLetter(Character guessedChar, String hiddenWord) {
-        if (hiddenWord.contains(guessedChar.toString())) {
-            System.out.println(showGuessedLetters(guessedChar, hiddenWord));
-
+    private static void checkLetter(Character guessedChar, String guessedWord) {
+        if (guessedWord.contains(guessedChar.toString())) {
+            System.out.println(showGuessedLetters(guessedChar, guessedWord));
+            System.out.println("Ошибок совершено" + mistakesCounter);
         } else {
+            System.out.println(showGuessedLetters(guessedChar, guessedWord));
             showHangman();
-            System.out.println(mistakesCounter++);
+            System.out.println("Ошибок совершено" + ++mistakesCounter);
         }
 
     }
@@ -114,17 +132,27 @@ public class Application {
 // отобразить часть виселицы / открыть буквы в маске
 
     private static String showGuessedLetters(Character guessedChar, String guessedWord) {
-        char[] stringToArray = guessedWord.toCharArray();
+
+
         for (int i = 0; i < guessedWord.length(); i++) {
-            if (stringToArray[i] == guessedChar) {
-                stringToArray[i] = guessedChar;
+            if (guessedWord.charAt(i) == guessedChar) {
+                hiddenWord.setCharAt(i, guessedChar);
+                correctAnswer++;
             }
         }
-        return Arrays.toString(stringToArray);
+        return hiddenWord.toString();
     }
 
     private static void showHangman() {
-        System.out.println("Haha");
+        System.out.println("""
+                                +---+
+                                |   |
+                                O   |
+                               /|\\  |
+                               / \\  |
+                                    |
+                            =========
+                """);
     }
 
 // после завершения игры предложить повторную игру или завершить работу
